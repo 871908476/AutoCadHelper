@@ -1,0 +1,21 @@
+{
+    "python.formatting.provider": "yapf",
+    "python.formatting.yapfArgs": [
+        "--style",
+        "{column_limit:100,align_closing_bracket_with_visual_indent=False}"
+    ],
+    "python.linting.mypyEnabled": true,
+    "python.linting.enabled": true,
+    "python.linting.pylintEnabled": false,
+    "python.linting.mypyArgs": [
+        "--show-column-numbers",
+        "--follow-imports skip",
+        "--no-pretty",
+        "--no-implicit-optional",
+        "--no-strict-optional",
+        "--ignore-missing-imports"
+    ],
+    "python.analysis.extraPaths": [
+        "./lib"
+    ]
+}
