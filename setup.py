@@ -11,6 +11,7 @@ import sys
 sys.path.append('./src')
 from src.common_utils import get_config, save_config
 
+
 def _create_ini():
     """创建配置文件"""
     conf_file = './conf/config.ini'
@@ -40,12 +41,12 @@ def _copy_template():
         name (str): 样式名称， 读取 res 文件夹下的 {name}.dwg 文件
         type (Literal): 样式类型， 创建 template 文件夹下的 {type}_style.template 模板文件
     """
-    for file, name, type in ((r'res\border_style_example.dwg', 'border_style_example',
+    for file, name, _type in ((r'res\border_style_example.dwg', 'border_style_example',
                               'border_style'), (r'res\catalog_style_example.dwg',
                                                 'catalog_style_example', 'catalog_style')):
         with open(file, 'rb') as f:
             tmp = {f'{name}': f.read()}
-            with open(f'./template/{type}.template', 'wb') as fw:
+            with open(f'./template/{_type}.template', 'wb') as fw:
                 pickle.dump(tmp, fw)
 
 

@@ -1,0 +1,5 @@
+!!python/object:src.config.SystemConfig
+acad_version: 24
+border_template_file: E:\repo\autocad-helper\template\border_style.template
+catalog_template_file: E:\repo\autocad-helper\template\catalog_style.template
+temp_path: E:\repo\autocad-helper\temp

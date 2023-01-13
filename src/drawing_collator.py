@@ -3,14 +3,11 @@
 图纸命名格式：[图号_][图名_]_子项名称.pdf/.dwf
 '''
 
-import logging
 import os
 import os.path
 import shutil
-import sys
-import yaml
 
-from abstract import Command
+import yaml
 
 
 class CategorizeBySubproject:

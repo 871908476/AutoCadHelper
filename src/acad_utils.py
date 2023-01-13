@@ -6,9 +6,8 @@ import sys
 
 from win32com.universal import com_error
 
-from lib.acad_typing.acadApplication import AcadApplication
-
 sys.path.append(os.path.abspath('../lib'))
+from lib.acad_typing.acadApplication import AcadApplication
 
 from lib.acad_typing.acadEnums import *
 from functools import wraps
@@ -19,8 +18,7 @@ from win32com.client import VARIANT
 import time
 import logging
 
-from common_utils import get_config
-
+from .common_utils import get_config
 
 if TYPE_CHECKING:
     from lib.acad_typing.acadObjects import *
@@ -107,7 +105,7 @@ def com_call_wrapper(f):
 
 
 @com_call_wrapper
-def get_application(*, version=24, visible=True) -> AcadApplication:
+def get_application(version=24, visible=True) -> AcadApplication:
     """
     获取应用实例 acadApplication 对象
 

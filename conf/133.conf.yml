@@ -1,0 +1,16 @@
+!!python/object:src.config.ProjectConfig
+catalog_generator: !!python/object:src.config.CatalogGenerator
+  close: 0
+  prefix: ''
+  style: ''
+  suffix: ''
+  target_file: E:/2022/鄂尔多斯133项目/CATALOG.dwg
+  update: 0
+excel_file: E:/2022/鄂尔多斯133项目/133无说明做法.xlsx
+name: '133'
+plot: !!python/object:src.config.Plot
+  named_template: <dwg_no>_<name>_<sub_project>.pdf
+  plot_device: DWG To PDF.pc3
+  plot_style: monochrome.ctb
+  print_path: E:/2022/鄂尔多斯133项目/print
+project_path: E:/2022/鄂尔多斯133项目

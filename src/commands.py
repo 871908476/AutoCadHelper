@@ -1,92 +1,82 @@
 '''auto cad 工具命令集'''
-from abc import abstractmethod
 import collections
-from copy import deepcopy
 import logging
 import os
 import re
-import sys
-
-from lib.acad_typing.acadApplication import AcadApplication
-from lib.acad_typing.acadDocuments import AcadDocument
-from lib.acad_typing.acadEntities import AcadBlockReference
-from lib.acad_typing.acadEnums import acRegenType
-
-
-sys.path.append('./lib')
+from copy import deepcopy
 
 import pandas as pd
+from typing import Dict, List, Tuple
 
-import common_utils
-from dataclasses import dataclass
-import acad_utils
-
-from typing import Dict, List, Tuple, Literal
-from acad_typing.acadApplication import *
-from acad_typing.acadEnums import *
-from acad_typing.acadBlocks import *
-from acad_typing.acadObjects import *
-
-
-class Command:
-    ''' 
-    抽象命令类 
-    
-    '''
-
-    def __init__(self, **kwargs) -> None:
-        pass
-
-    @abstractmethod
-    def execute(self):
-        pass
+from lib.acad_typing.acadDocuments import *
+from lib.acad_typing.acadEntities import *
+from lib.acad_typing.acadEnums import *
+from . import acad_utils, common_utils
+from .abstract import Command
 
 
 
-@dataclass(frozen=True, kw_only=True)
-class CatalogStyle:
-    """ 目录样式 
-    
-    Args:
-        template_name: str 模板文件路径
-        paper: str 打印图纸尺寸
-        table_block_name: str   表格图块名称，默认为 'table'
-        cell_block_name: str    单元格图块名称，默认为 'cell'
 
 
+
+
+# 创建临时文件
+def _create_temp_file(template_file: str, style_name: str, temp_path: str) -> str:
     """
-    template_file: str
-    paper: str = 'A1'
-    table_block_name: str = 'table'
-    cell_block_name: str = 'cell'
-
-
-@dataclass(frozen=True, kw_only=True)
-class BorderStyle:
-    """
-    图框样式
+    创建临时文件
 
     Args:
-        template_file: str  模板文件路径
-        size: str  图纸尺寸
+        template_file (str): 模板文件路径
+        style_name (str): 模板样式名称
+        temp_path (str): 临时文件所在文件夹路径
+
+    Returns:
+        str: 临时文件路径, 临时文件的文件名为模板样式名
     """
-    template_file: str
-    size: str
-    border_block_name: str
-    signature_block_name: str
+    target_file = os.path.join(temp_path, f'{style_name}.dwg')
+    with open(template_file, 'rb') as f:
+        tmp: dict = pickle.load(f)
+        _data = tmp.get(style_name, None)
+        if _data is None:
+            raise IOError(f'{style_name} 样式不存在')
+        _dir = os.path.dirname(target_file)
+        if not os.path.exists(_dir):
+            os.makedirs(_dir)
+        with open(target_file, 'wb') as fw:
+            fw.write(_data)
+    return target_file
+
+
+def _create_catalog_style():
+    """
+    获取模板样式
+    """
+    try:
+        conf = common_utils.get_config()
+        style_name = conf['catalog']['catalog_style']
+        sect_name = 'catalog_style.' + style_name
+        if sect_name in conf.sections():
+            sect = conf[sect_name]
+        else:
+            sect = conf[sect_name]
+        _paper = conf['plot.paper_size'][sect.get('size')]
+        ##############################
+        # template_file = _create_temp_file(sect['catalog_template_file'], style_name,
+        #                                   sect['temp_path'])
+        #######################
+        return CatalogStyle(template_file=r'E:\repo\autocad-helper\temp\catalog_style_gongchengyuan.dwg',
+                            # template_file,
+                            paper=_paper,
+                            table_block_name=sect['table_block_name'],
+                            cell_block_name=sect['cell_block_name'])
+    except Exception as e:
+        logging.error(e.args)
+        raise
 
 
 class CreateCatalog(Command):
 
-    def __init__(self,
-                 *,
-                 application: AcadApplication,
-                 catalog_data: Dict[str, List[Dict]],
-                 catalog_style: CatalogStyle,
-                 target_file: str,
-                 update=True,
-                 close=True,
-                 **kwargs) -> None:
+    def __init__(self, **kwargs) -> None:
         """
         创建目录
 
@@ -99,13 +89,25 @@ class CreateCatalog(Command):
             update (bool, optional): 对目录进行更新而不是重新插入表格. Defaults to True.
             close (bool, optional): 插入目录后关闭. Defaults to True.
         """
-        self.__app = application
-        self.__catalog_style = catalog_style
-        self.__data = catalog_data
-        self.__target = target_file
-        self.__update = update
-        self.__close = close
-        """保存到目标文件"""
+
+        sect = common_utils.modify_catalog_config()
+
+        # 读取 excel 数据
+        _suffix = sect.get('suffix')
+        _prefix = sect.get('prefix')
+        _excel_file = sect.get('excel_file')
+        self.__data: Dict[str, List[Dict]] = {}
+        _: Dict[str, pd.DataFrame] = pd.read_excel(_excel_file, sheet_name=None, dtype=str)
+        # 创建目录表格数据
+        for k, v in _.items():
+            self.__data[_prefix + k + _suffix] = [i for i in v.to_dict(orient='index').values()]
+
+        self.__app = acad_utils.get_application()
+        self.__catalog_style = _create_catalog_style()
+        self.__target = sect.get('target_file')
+        self.__update = sect.getboolean('update')
+        self.__close = sect.getboolean('close')
+
         super().__init__(**kwargs)
 
     def execute(self):
@@ -140,7 +142,6 @@ class CreateCatalog(Command):
         acad_utils.del_block_from_doc(doc, catalog_block.Name)
         doc.Regen(acRegenType.acAllViewports.value)
 
-
         # 更新表格数据
         for _ly_name, cell_list in self.__data.items():
             ly_name = _ly_name.replace('建筑物', '目录')
@@ -171,12 +172,7 @@ class CreateCatalog(Command):
 
 class InsertBorder(Command):
 
-    def __init__(self,
-                 *,
-                 application: AcadApplication,
-                 data: List[Tuple[str, str, BorderStyle]],
-                 close=True,
-                 **kwargs) -> None:
+    def __init__(self, **kwargs) -> None:
         """
         插入图框
 
@@ -188,10 +184,35 @@ class InsertBorder(Command):
                      -- border_style (BorderStyle): 图框样式
             close (bool): 插入图框后是否关闭文件
         """
-        self._app = application
-        self.__data = data
-        self._close = close
         super().__init__(**kwargs)
+        self._app = acad_utils.get_application()
+        self.__data: List[Tuple[str, str, BorderStyle]] = []
+
+        # 从配置文件读取上一次的配置
+        sect = common_utils.modify_border_config()
+        _: Dict[str, pd.DataFrame] = pd.read_excel(sect.get('excel_file'),
+                                                   dtype=str,
+                                                   sheet_name=None)
+        self._close = sect.getboolean('close')
+
+        styles_dict = {}
+        _dir = sect['target_path']
+        for ignor, tb_data in _.items():
+            tb_data.dropna(inplace=True,
+                           axis='index',
+                           subset=['border_style', 'layout', 'file'],
+                           how='any')
+            for dic in tb_data.to_dict(orient='records'):
+                style_name = dic.get('border_style')
+                if style_name not in styles_dict.keys():
+                    _file = _create_temp_file(template_file=sect.get('border_template_file'),
+                                              style_name=style_name,
+                                              temp_path=sect.get('temp_path'))
+                    _size = common_utils.get_config()['border_style.' + style_name]['size']
+                    styles_dict[style_name] = BorderStyle(template_file=_file, size=_size)
+                self.__data.append(
+                    (os.path.join(_dir,
+                                  dic.get('file')), dic.get('layout'), styles_dict[style_name]))
 
     def execute(self):
         tmp = collections.defaultdict(list)
@@ -200,9 +221,9 @@ class InsertBorder(Command):
             tmp[f].append((ly_name, border_style))
         # 遍历文件
         for f, arr in tmp.items():
-            try:
-                doc = acad_utils.open_file(self._app, f)
-                for ly_name, border_style in arr:
+            doc = acad_utils.open_file(self._app, f)
+            for ly_name, border_style in arr:
+                try:
                     ly = doc.Layouts.Item(ly_name)
                     _, _n = os.path.split(border_style.template_file)
                     name, _ = os.path.splitext(_n)
@@ -210,12 +231,12 @@ class InsertBorder(Command):
                     bi = ly.Block.InsertBlock(acad_utils.ORIGIN_POINT, border_style.template_file,
                                               1, 1, 1, 0)
                     bi.Layer = '0'
-                if self._close:
-                    doc.Save()
-                    doc.Close()
-            except Exception as e:
-                logging.error(f'InsertBorder Error --> {f} --> {ly_name} --> {e.args}')
-                raise
+                except Exception as e:
+                    logging.error(f'InsertBorder Error --> {f} --> {ly_name} --> {e.args}')
+                    raise
+            if self._close:
+                doc.Save()
+                doc.Close()
 
         return super().execute()
 
@@ -408,6 +429,8 @@ class ModifyLayerAttr(Command):
                 ...
 
         return super().execute()
+
+
 class InsertSignatureAndPlot(Command):
     """插入图签并打印"""
 
@@ -434,8 +457,8 @@ class ModifySignatureAndPlot(Command):
             close (bool, optional): 修改完成后关闭文档. Defaults to True.
          """
         # 获取参数
-        _ver = common_utils.get_config()['DEFAULT'].getint('acad_version', 23)
-        self.__app = acad_utils.get_application(version=_ver)
+        super().__init__(**kwargs)
+        self.__app = _get_acad_app()
 
         self.__plot = plot
         self.__close = close
@@ -507,35 +530,3 @@ class ModifySignatureAndPlot(Command):
                 doc.Close(True)
 
 
-class AddCatalogTemplate(Command):
-    """添加目录模板"""
-    def __init__(self, **kwargs) -> None:
-        super().__init__(**kwargs)
-        self._frm = common_utils.AddTemplate(style_type='catalog_style')
-
-    def execute(self):
-        self._frm.mainloop()
-
-if __name__ == '__main__':
-    print('*' * 20)
-    # app = acad_utils.get_application()
-    # # doc = acad_utils.get_application().ActiveDocument
-    # for f in askopenfiles(filetypes=[('Autocad 文件', '*.dwg')]):
-    #     doc = acad_utils.open_file(app, f.name)
-    #     ModifyLayerLineweight(doc,
-    #                           heavy_pattern='*a-wall*|*wall|*col*',
-    #                           heavy_ex_pattern='*wall*隔墙|*elve*wall',
-    #                           middle_pattern='*wind*|*roof',
-    #                           middle_ex_pattern='*wind*(text|编号|open)').execute()
-    #     # doc.Save()
-    #     print(doc.ReadOnly)
-    #
-    #     break
-
-    # FreezeLayer(doc, name_pattern='*window_text|door_*text', unfreeze=True).execute()
-
-    # color = acad_utils.get_application().GetInterfaceObject("AutoCAD.AcCmColor.24")
-    # print(app.GetInterfaceObject("AutoCAD.AcLineWeight.24")._wrapped_object)
-    # print(color._wrapped_object.SetRGB)
-    # ModifySignatureAndPlot(plot=True, close=True).execute()
-    ModifySignatureAndPlot().execute()
