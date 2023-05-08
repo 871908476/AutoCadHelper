@@ -96,7 +96,7 @@ class CopyGeneralToSubprojectCMD:
 
 if __name__ == '__main__':
     print('*' * 20)
-#     CategorizeBySubproject().action()
+    CategorizeBySubproject().action()
 
 # while True:
 #     cmds = [('CategorizeBySubproject', '按子项分类'), ('CopyGeneralToSubproject', '将通用图拷贝的各个子项文件夹')]
